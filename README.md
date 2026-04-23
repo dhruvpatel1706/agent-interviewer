@@ -126,10 +126,20 @@ flake8 src tests --max-line-length=100 --ignore=E501,W503,E203
 
 ## Roadmap
 
-- [ ] v0.2 — longitudinal tracking: after N sessions, show score trend per dimension
+- [x] **v0.2 — longitudinal tracking: `progress` subcommand shows per-dimension trends with sparklines**
 - [ ] v0.3 — custom persona packs loaded from a YAML file (user-defined rubrics)
 - [ ] v0.4 — replay mode: step through past sessions with alternative feedback models
 - [ ] v0.5 — web UI (FastAPI + HTMX)
+
+### Progress tracking (v0.2)
+
+```
+agent-interviewer progress
+# Or just one persona:
+agent-interviewer progress -t system-design
+```
+
+Reads every paired (transcript, feedback) in the sessions dir, groups by persona, and shows per-dimension sparklines + trend-since-prior-sessions. Scores from different personas are never averaged together (each persona's rubric is different by design).
 
 ## License
 

@@ -1,6 +1,6 @@
 [project]
 name = "agent-interviewer"
-version = "0.1.0"
+version = "0.2.0"
 description = "Mock interview CLI with multiple LLM personas (behavioral, system design, coding, case) and a post-session feedback agent."
 readme = "README.md"
 requires-python = ">=3.10"

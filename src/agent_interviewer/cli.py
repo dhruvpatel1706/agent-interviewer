@@ -191,5 +191,71 @@ def _print_feedback_for(session: Session, settings) -> None:  # type: ignore[no-
     )
 
 
+@app.command("progress")
+def progress_cmd(
+    persona_key: str = typer.Option(
+        None,
+        "--type",
+        "-t",
+        help="Filter by persona (behavioral, system-design, coding, case). Default: all.",
+    ),
+) -> None:
+    """Show per-dimension score trends across past sessions."""
+    from agent_interviewer.progress import (
+        dimension_trends,
+        filter_by_persona,
+        load_records,
+        sparkline,
+    )
+
+    settings = get_settings()
+    records = filter_by_persona(load_records(settings.sessions_dir), persona_key)
+    if not records:
+        msg = (
+            "[dim]No sessions with feedback yet.[/dim]"
+            if persona_key is None
+            else f"[dim]No {persona_key!r} sessions yet.[/dim]"
+        )
+        console.print(msg)
+        return
+
+    # Group by persona when no filter is set, so scores from different rubrics
+    # aren't averaged into each other.
+    by_persona: dict[str, list] = {}
+    for rec in records:
+        by_persona.setdefault(rec.persona, []).append(rec)
+
+    for persona_name, persona_records in sorted(by_persona.items()):
+        trends = dimension_trends(persona_records)
+        console.print(
+            f"\n[bold cyan]{persona_name}[/bold cyan]  "
+            f"[dim]({len(persona_records)} session(s))[/dim]"
+        )
+        table = Table(show_header=True, header_style="bold")
+        table.add_column("dimension", no_wrap=True)
+        table.add_column("trend")
+        table.add_column("latest", justify="right")
+        table.add_column("mean", justify="right")
+        table.add_column("Δ vs prior", justify="right")
+        for name in sorted(trends):
+            t = trends[name]
+            scores_only = [s for _, s in t.scores]
+            arrow = "→"
+            color = "dim"
+            if t.delta > 0.3:
+                arrow, color = "↑", "green"
+            elif t.delta < -0.3:
+                arrow, color = "↓", "red"
+            sp = sparkline(scores_only)
+            table.add_row(
+                name,
+                f"[yellow]{sp}[/yellow]",
+                f"{t.latest}/5",
+                f"{t.mean:.1f}",
+                f"[{color}]{arrow} {t.delta:+.1f}[/{color}]",
+            )
+        console.print(table)
+
+
 if __name__ == "__main__":
     app()
