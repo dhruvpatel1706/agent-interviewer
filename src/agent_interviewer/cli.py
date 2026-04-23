@@ -280,6 +280,17 @@ def _print_feedback_for(session: Session, settings) -> None:  # type: ignore[no-
     _render_feedback(fb)
 
 
+@app.command("serve")
+def serve_cmd(
+    host: str = typer.Option("127.0.0.1", help="Host to bind. Stay on localhost."),
+    port: int = typer.Option(8765, help="Port."),
+) -> None:
+    """Start the read-only web viewer on http://host:port/ui."""
+    import uvicorn
+
+    uvicorn.run("agent_interviewer.server:app", host=host, port=port)
+
+
 @app.command("progress")
 def progress_cmd(
     persona_key: str = typer.Option(
