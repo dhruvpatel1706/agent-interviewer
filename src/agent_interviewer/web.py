@@ -25,7 +25,6 @@ from agent_interviewer.storage import (
     list_feedback_variants,
     load_session,
     meta_path,
-    session_path,
 )
 
 router = APIRouter()

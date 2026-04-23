@@ -1,7 +1,7 @@
 [project]
 name = "agent-interviewer"
-version = "0.4.0"
-description = "Mock interview CLI with multiple LLM personas (behavioral, system design, coding, case) and a post-session feedback agent."
+version = "0.5.0"
+description = "Mock interview CLI + read-only web viewer. Built-in and YAML persona packs, per-dimension feedback, replay with different models, longitudinal progress sparklines."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

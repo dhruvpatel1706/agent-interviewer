@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from agent_interviewer.models import DimensionScore, Feedback, Session, Turn
+from agent_interviewer.models import DimensionScore, Feedback, Turn
 from agent_interviewer.server import app
 from agent_interviewer.storage import save_meta, save_turn, write_feedback
 
