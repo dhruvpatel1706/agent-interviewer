@@ -28,6 +28,8 @@ def _fb(scores_by_dim: dict[str, int]) -> Feedback:
 
 
 def _write_pair(sessions_dir: Path, session_id: str, persona: str, when: datetime, fb: Feedback):
+    from agent_interviewer.storage import save_meta
+
     sessions_dir.mkdir(parents=True, exist_ok=True)
     # Transcript with at least one turn so load_records will accept it.
     session = Session(
@@ -41,6 +43,7 @@ def _write_pair(sessions_dir: Path, session_id: str, persona: str, when: datetim
     (sessions_dir / f"{session_id}.feedback.json").write_text(
         fb.model_dump_json(), encoding="utf-8"
     )
+    save_meta(sessions_dir, session_id, persona)
 
 
 def test_load_skips_sessions_without_feedback(tmp_path):

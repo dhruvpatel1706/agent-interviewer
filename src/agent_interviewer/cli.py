@@ -16,7 +16,7 @@ from agent_interviewer.feedback import generate_feedback
 from agent_interviewer.models import Session
 from agent_interviewer.personas import PERSONAS, get_persona
 from agent_interviewer.session import append_turn, interviewer_reply
-from agent_interviewer.storage import load_session, save_turn, write_feedback
+from agent_interviewer.storage import load_session, save_meta, save_turn, write_feedback
 
 app = typer.Typer(
     add_completion=False,
@@ -66,6 +66,10 @@ def _run_interview_loop(session: Session, settings) -> None:  # type: ignore[no-
             border_style="cyan",
         )
     )
+
+    # Persist the persona-of-record once at session start (v0.2 — lets
+    # `progress` group sessions by their persona without guessing).
+    save_meta(settings.sessions_dir, session.id, persona.key)
 
     # If this is a fresh session, open with the interviewer's kickoff.
     if not session.turns:
