@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from agent_interviewer.storage import list_feedback_variants, write_feedback
 
 

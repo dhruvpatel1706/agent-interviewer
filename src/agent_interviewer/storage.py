@@ -63,9 +63,43 @@ def load_session(sessions_dir: Path, session_id: str, persona: str) -> Session:
     return Session(id=session_id, persona=actual_persona, turns=turns)
 
 
-def write_feedback(sessions_dir: Path, session_id: str, feedback_json: str) -> Path:
-    """Save feedback as a sidecar `.feedback.json` next to the session's JSONL."""
+def write_feedback(
+    sessions_dir: Path,
+    session_id: str,
+    feedback_json: str,
+    *,
+    variant: str | None = None,
+) -> Path:
+    """Save feedback as a sidecar next to the session's JSONL.
+
+    With no `variant`, writes `<session_id>.feedback.json` (the default the
+    interview loop uses). With a `variant` (e.g. a model slug like
+    `claude-sonnet-4-6`), writes `<session_id>.feedback.<variant>.json` so
+    the original feedback isn't overwritten. Useful for replaying a
+    transcript through a different evaluator.
+    """
     sessions_dir.mkdir(parents=True, exist_ok=True)
-    out = sessions_dir / f"{session_id}.feedback.json"
+    if variant:
+        safe = "".join(c if c.isalnum() or c in "-._" else "_" for c in variant)
+        out = sessions_dir / f"{session_id}.feedback.{safe}.json"
+    else:
+        out = sessions_dir / f"{session_id}.feedback.json"
     out.write_text(feedback_json, encoding="utf-8")
     return out
+
+
+def list_feedback_variants(sessions_dir: Path, session_id: str) -> list[str]:
+    """Return every variant label we have saved for a session.
+
+    Empty string represents the default (unlabeled) feedback file.
+    """
+    out: list[str] = []
+    if (sessions_dir / f"{session_id}.feedback.json").exists():
+        out.append("")
+    prefix = f"{session_id}.feedback."
+    for p in sessions_dir.glob(f"{session_id}.feedback.*.json"):
+        name = p.name
+        label = name[len(prefix) : -len(".json")]
+        if label:
+            out.append(label)
+    return sorted(out)
