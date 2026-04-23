@@ -24,6 +24,7 @@ app = typer.Typer(
     help="Multi-persona mock interview CLI backed by Claude.",
 )
 console = Console()
+err = Console(stderr=True)
 
 
 def _version_callback(value: bool) -> None:
