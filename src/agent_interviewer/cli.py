@@ -16,7 +16,13 @@ from agent_interviewer.feedback import generate_feedback
 from agent_interviewer.models import Session
 from agent_interviewer.personas import PERSONAS, get_persona
 from agent_interviewer.session import append_turn, interviewer_reply
-from agent_interviewer.storage import load_session, save_meta, save_turn, write_feedback
+from agent_interviewer.storage import (
+    list_feedback_variants,
+    load_session,
+    save_meta,
+    save_turn,
+    write_feedback,
+)
 
 app = typer.Typer(
     add_completion=False,
@@ -184,13 +190,58 @@ def feedback_cmd(session_id: str = typer.Argument(...)) -> None:
     _print_feedback_for(session, settings)
 
 
-def _print_feedback_for(session: Session, settings) -> None:  # type: ignore[no-untyped-def]
-    persona = get_persona(session.persona)
-    console.print()
-    with console.status("[cyan]Generating feedback...", spinner="dots"):
-        fb = generate_feedback(persona, session, settings)
-    write_feedback(settings.sessions_dir, session.id, fb.model_dump_json(indent=2))
+@app.command("replay")
+def replay_cmd(
+    session_id: str = typer.Argument(..., help="ID of a previously-recorded session."),
+    model: str = typer.Option(
+        ...,
+        "--model",
+        "-m",
+        help="Which feedback model to re-score with (e.g. claude-sonnet-4-6).",
+    ),
+    pack: str = typer.Option(None, "--pack", "-p"),
+) -> None:
+    """Re-run the feedback agent on an old transcript with a different model.
 
+    Writes a new sidecar `<session_id>.feedback.<model>.json` so the original
+    feedback is preserved. Useful for second-opinion evaluation or for
+    re-scoring after you've updated a persona's rubric.
+    """
+    _maybe_load_pack(pack)
+    settings = get_settings()
+    session = load_session(settings.sessions_dir, session_id, persona="behavioral")
+    if not session.turns:
+        err.print(f"[red]No session found at id {session_id}[/red]")
+        raise typer.Exit(1)
+
+    try:
+        persona = get_persona(session.persona)
+    except KeyError as exc:
+        err.print(
+            f"[red]{exc}[/red] — did you forget to pass --pack with the "
+            "YAML file that defines that persona?"
+        )
+        raise typer.Exit(1)
+
+    # Override just the feedback model, keep everything else.
+    scoped = settings.model_copy(update={"feedback_model": model})
+
+    console.print(f"[dim]Replaying {session_id} (persona={persona.key}, model={model})...[/dim]")
+    with console.status("[cyan]Generating feedback...", spinner="dots"):
+        fb = generate_feedback(persona, session, scoped)
+    path = write_feedback(
+        settings.sessions_dir, session.id, fb.model_dump_json(indent=2), variant=model
+    )
+    console.print(f"[green]Saved[/green] {path}")
+    _render_feedback(fb)
+
+    variants = list_feedback_variants(settings.sessions_dir, session.id)
+    variants_display = ", ".join(v or "original" for v in variants) or "(none)"
+    console.print(f"\n[dim]Variants on file for {session.id}: {variants_display}[/dim]")
+
+
+def _render_feedback(fb) -> None:  # type: ignore[no-untyped-def]
+    """Render a Feedback object to the console. Shared between live + replay."""
     console.print(Panel(fb.overall, title="Overall", border_style="cyan"))
 
     dim_table = Table(show_header=True, header_style="bold cyan", title="Per-dimension scores")
@@ -218,6 +269,15 @@ def _print_feedback_for(session: Session, settings) -> None:  # type: ignore[no-
     console.print(
         f"\n[bold]Mock recommendation:[/bold] [{color}]{fb.mock_recommendation}[/{color}]"
     )
+
+
+def _print_feedback_for(session: Session, settings) -> None:  # type: ignore[no-untyped-def]
+    persona = get_persona(session.persona)
+    console.print()
+    with console.status("[cyan]Generating feedback...", spinner="dots"):
+        fb = generate_feedback(persona, session, settings)
+    write_feedback(settings.sessions_dir, session.id, fb.model_dump_json(indent=2))
+    _render_feedback(fb)
 
 
 @app.command("progress")
