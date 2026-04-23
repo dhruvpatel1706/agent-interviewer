@@ -127,9 +127,33 @@ flake8 src tests --max-line-length=100 --ignore=E501,W503,E203
 ## Roadmap
 
 - [x] **v0.2 — longitudinal tracking: `progress` subcommand shows per-dimension trends with sparklines**
-- [ ] v0.3 — custom persona packs loaded from a YAML file (user-defined rubrics)
+- [x] **v0.3 — YAML persona packs for user-defined rubrics**
 - [ ] v0.4 — replay mode: step through past sessions with alternative feedback models
 - [ ] v0.5 — web UI (FastAPI + HTMX)
+
+### Persona packs (v0.3)
+
+Drop a `~/.agent-interviewer/personas.yml` (or point `AGENT_INTERVIEWER_PACK` at another path) to add your own personas:
+
+```yaml
+personas:
+  - key: ml-research-behavioral
+    display_name: ML research scientist behavioral
+    dimensions:
+      - research taste
+      - experimental rigor
+      - collaboration
+      - publication track record
+    system_prompt: |
+      You are a research manager at a top ML lab.
+      Probe for specificity in past research decisions:
+        - why they picked one experiment over another,
+        - what they'd do differently now,
+        - how they collaborated with colleagues who disagreed.
+      Do not grade during the interview.
+```
+
+`agent-interviewer personas` lists built-ins + loaded. `start --type ml-research-behavioral` picks one. Key collisions with the four built-ins raise at load time so you can't accidentally shadow `coding`.
 
 ### Progress tracking (v0.2)
 

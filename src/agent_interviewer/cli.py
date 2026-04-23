@@ -46,8 +46,16 @@ def main(
 
 
 @app.command("personas")
-def personas_cmd() -> None:
-    """List available interviewer personas."""
+def personas_cmd(
+    pack: str = typer.Option(
+        None,
+        "--pack",
+        "-p",
+        help="Load a custom YAML pack before listing. Default: $AGENT_INTERVIEWER_PACK or ~/.agent-interviewer/personas.yml.",
+    ),
+) -> None:
+    """List available interviewer personas (built-in + loaded from a pack)."""
+    _maybe_load_pack(pack)
     table = Table(show_header=True, header_style="bold cyan", title="Interviewer personas")
     table.add_column("key")
     table.add_column("name")
@@ -55,6 +63,20 @@ def personas_cmd() -> None:
     for p in PERSONAS.values():
         table.add_row(p.key, p.display_name, ", ".join(p.dimensions))
     console.print(table)
+
+
+def _maybe_load_pack(pack_path_str: str | None) -> None:
+    """Load the YAML pack (explicit or default location) if present."""
+    from agent_interviewer.pack_loader import load_and_register_default
+
+    explicit = __import__("pathlib").Path(pack_path_str) if pack_path_str else None
+    try:
+        load_and_register_default(explicit=explicit, quiet=True)
+    except FileNotFoundError as exc:
+        err.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+    except Exception as exc:
+        err.print(f"[yellow](ignoring invalid pack: {exc})[/yellow]")
 
 
 def _run_interview_loop(session: Session, settings) -> None:  # type: ignore[no-untyped-def]
@@ -109,13 +131,15 @@ def start_cmd(
         "behavioral",
         "--type",
         "-t",
-        help=f"Persona key. Options: {', '.join(sorted(PERSONAS))}",
+        help="Persona key. Run `agent-interviewer personas` to list.",
     ),
+    pack: str = typer.Option(None, "--pack", "-p", help="Custom YAML persona pack."),
     no_feedback: bool = typer.Option(
         False, "--no-feedback", help="Skip the post-session feedback agent."
     ),
 ) -> None:
     """Start a new mock interview."""
+    _maybe_load_pack(pack)
     settings = get_settings()
     persona = get_persona(persona_key)
     session = Session(id=uuid.uuid4().hex[:10], persona=persona.key)
