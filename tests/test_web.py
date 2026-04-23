@@ -113,6 +113,97 @@ def test_session_detail_escapes_xss(client, tmp_path):
     assert "&lt;script&gt;" in resp.text
 
 
+def test_session_detail_shows_compare_link_with_two_variants(client, tmp_path):
+    _seed(tmp_path, "two-variants", "coding")
+    write_feedback(tmp_path, "two-variants", _feedback({"x": 3}).model_dump_json())
+    write_feedback(
+        tmp_path, "two-variants", _feedback({"x": 4}).model_dump_json(), variant="sonnet"
+    )
+    resp = client.get("/ui/session/two-variants")
+    assert resp.status_code == 200
+    assert "compare variants" in resp.text
+    assert "/compare?a=" in resp.text
+
+
+def test_session_detail_no_compare_link_with_one_variant(client, tmp_path):
+    _seed(tmp_path, "one-variant", "coding")
+    write_feedback(tmp_path, "one-variant", _feedback({"x": 3}).model_dump_json())
+    resp = client.get("/ui/session/one-variant")
+    assert "compare variants" not in resp.text
+
+
+def test_compare_deltas_match(client, tmp_path):
+    _seed(tmp_path, "cmp-1", "coding")
+    write_feedback(
+        tmp_path,
+        "cmp-1",
+        _feedback({"clarity": 3, "correctness": 4}).model_dump_json(),
+    )
+    write_feedback(
+        tmp_path,
+        "cmp-1",
+        _feedback({"clarity": 5, "correctness": 4}).model_dump_json(),
+        variant="sonnet",
+    )
+    resp = client.get("/ui/session/cmp-1/compare?a=original&b=sonnet")
+    assert resp.status_code == 200
+    body = resp.text
+    # Delta for clarity = 5 - 3 = +2, rendered in delta-up span
+    assert "+2" in body
+    assert "delta-up" in body
+    # Correctness unchanged → a 0 in the delta-zero class
+    assert "delta-zero" in body
+    # Both variants' observations visible side-by-side
+    assert body.count("ob") >= 2
+
+
+def test_compare_highlights_recommendation_mismatch(client, tmp_path):
+    _seed(tmp_path, "cmp-rec", "coding")
+
+    def _fb(rec, score):
+        return Feedback(
+            overall="o",
+            dimensions=[
+                DimensionScore(dimension="x", score=score, observation="ob", suggestion="s")
+            ],
+            strengths=["s1"],
+            growth_areas=["g1"],
+            mock_recommendation=rec,
+        )
+
+    write_feedback(tmp_path, "cmp-rec", _fb("needs-more-prep", 2).model_dump_json())
+    write_feedback(
+        tmp_path,
+        "cmp-rec",
+        _fb("ready-to-interview", 4).model_dump_json(),
+        variant="haiku",
+    )
+    resp = client.get("/ui/session/cmp-rec/compare?a=original&b=haiku")
+    body = resp.text
+    # Both recommendations rendered, and mismatch class applied to both
+    assert "needs-more-prep" in body
+    assert "ready-to-interview" in body
+    assert "mismatch" in body
+
+
+def test_compare_missing_variant_returns_readable_error(client, tmp_path):
+    _seed(tmp_path, "cmp-missing", "coding")
+    write_feedback(tmp_path, "cmp-missing", _feedback({"x": 3}).model_dump_json())
+    resp = client.get("/ui/session/cmp-missing/compare?a=original&b=nope")
+    assert resp.status_code == 200
+    assert "not found" in resp.text.lower()
+
+
+def test_compare_defaults_b_to_other_variant(client, tmp_path):
+    _seed(tmp_path, "cmp-default", "coding")
+    write_feedback(tmp_path, "cmp-default", _feedback({"x": 3}).model_dump_json())
+    write_feedback(tmp_path, "cmp-default", _feedback({"x": 4}).model_dump_json(), variant="haiku")
+    # Only `a` provided; `b` should auto-pick the only other variant.
+    resp = client.get("/ui/session/cmp-default/compare?a=original")
+    assert resp.status_code == 200
+    assert "haiku" in resp.text
+
+
 def test_progress_page_empty(client):
     resp = client.get("/ui/progress")
     assert resp.status_code == 200

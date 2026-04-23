@@ -1,6 +1,6 @@
 [project]
 name = "agent-interviewer"
-version = "0.5.0"
+version = "0.6.0"
 description = "Mock interview CLI + read-only web viewer. Built-in and YAML persona packs, per-dimension feedback, replay with different models, longitudinal progress sparklines."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -31,6 +31,7 @@ dependencies = [
 [project.optional-dependencies]
 web = [
     "fastapi>=0.100.0",
+    "uvicorn>=0.24.0",
 ]
 dev = [
     "pytest>=8.0.0",
@@ -39,6 +40,7 @@ dev = [
     "isort>=5.13.0",
     "flake8>=7.0.0",
     "fastapi>=0.100.0",
+    "uvicorn>=0.24.0",
     "httpx>=0.25.0",
 ]
 

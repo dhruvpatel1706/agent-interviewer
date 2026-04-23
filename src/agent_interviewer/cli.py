@@ -286,8 +286,14 @@ def serve_cmd(
     port: int = typer.Option(8765, help="Port."),
 ) -> None:
     """Start the read-only web viewer on http://host:port/ui."""
-    import uvicorn
-
+    try:
+        import uvicorn
+    except ImportError:
+        console.print(
+            "[red]Web viewer needs the [bold]web[/bold] extra.[/red] "
+            "Install with [cyan]pip install 'agent-interviewer[web]'[/cyan]."
+        )
+        raise typer.Exit(1)
     uvicorn.run("agent_interviewer.server:app", host=host, port=port)
 
 
@@ -355,6 +361,72 @@ def progress_cmd(
                 f"[{color}]{arrow} {t.delta:+.1f}[/{color}]",
             )
         console.print(table)
+
+
+@app.command("diff")
+def diff_cmd(
+    session_id: str = typer.Argument(..., help="Session to inspect."),
+    a: str = typer.Argument("original", help="Left-hand variant (default: original)."),
+    b: str = typer.Argument(..., help="Right-hand variant (e.g. a model slug from replay)."),
+) -> None:
+    """Diff two feedback variants for the same transcript.
+
+    Useful when you've run `replay <id> --model ...` and want to see exactly
+    where the two evaluators disagree without squinting at two JSON files.
+    """
+    from agent_interviewer.models import Feedback
+
+    settings = get_settings()
+
+    def _load(variant: str):  # type: ignore[no-untyped-def]
+        if variant in ("", "original"):
+            p = settings.sessions_dir / f"{session_id}.feedback.json"
+        else:
+            p = settings.sessions_dir / f"{session_id}.feedback.{variant}.json"
+        if not p.is_file():
+            err.print(f"[red]Variant {variant!r} not found for {session_id!r}[/red]")
+            raise typer.Exit(1)
+        return Feedback.model_validate_json(p.read_text(encoding="utf-8"))
+
+    fb_a = _load(a)
+    fb_b = _load(b)
+
+    console.print(f"\n[bold]{session_id}[/bold]: [cyan]{a}[/cyan] vs [cyan]{b}[/cyan]\n")
+
+    dims_a = {d.dimension: d for d in fb_a.dimensions}
+    dims_b = {d.dimension: d for d in fb_b.dimensions}
+
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("dimension", no_wrap=True)
+    table.add_column(f"{a}", justify="right")
+    table.add_column(f"{b}", justify="right")
+    table.add_column("Δ", justify="right")
+    for name in sorted(set(dims_a) | set(dims_b)):
+        da, db = dims_a.get(name), dims_b.get(name)
+        sa = f"{da.score}/5" if da else "—"
+        sb = f"{db.score}/5" if db else "—"
+        if da and db:
+            d = db.score - da.score
+            if d > 0:
+                delta_str = f"[green]+{d}[/green]"
+            elif d < 0:
+                delta_str = f"[red]{d}[/red]"
+            else:
+                delta_str = "[dim]0[/dim]"
+        else:
+            delta_str = "[dim]—[/dim]"
+        table.add_row(name, sa, sb, delta_str)
+    console.print(table)
+
+    # Recommendation — loud if they disagree, quiet if they match.
+    if fb_a.mock_recommendation != fb_b.mock_recommendation:
+        console.print(
+            f"\n[bold yellow]Recommendation differs:[/bold yellow] "
+            f"{a} → [cyan]{fb_a.mock_recommendation}[/cyan], "
+            f"{b} → [cyan]{fb_b.mock_recommendation}[/cyan]"
+        )
+    else:
+        console.print(f"\n[dim]Recommendation: both {fb_a.mock_recommendation}[/dim]")
 
 
 if __name__ == "__main__":
